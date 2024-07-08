@@ -1,0 +1,18 @@
+[project]
+name = "Phone-Assistant"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [
+    {name = "H1DDENADM1N", email = "65646535+H1DDENADM1N@users.noreply.github.com"},
+]
+dependencies = [
+    "watchdog>=4.0.1",
+    "loguru>=0.7.2",
+]
+requires-python = "==3.12.*"
+readme = "README.md"
+license = {text = "GPLv3"}
+
+
+[tool.pdm]
+distribution = false

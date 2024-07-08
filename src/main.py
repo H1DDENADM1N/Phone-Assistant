@@ -44,9 +44,12 @@ class Handler(FileSystemEventHandler):
         if (
             event.event_type == "modified"
             and is_audio(FILE_PATH)
+            and not is_using_by_others(FILE_PATH)
             and not TXT_PATH.exists()
         ):
-            logger.info(f"监测到音频文件修改且没有对应的txt文件 - {FILE_PATH}")
+            logger.info(
+                f"监测到音频文件修改，没有对应的txt文件，未被其他程序占用 - {FILE_PATH}"
+            )
             is_valid, msg = check_audio_integrity(FILE_PATH)
         else:
             logger.debug(f"非音频文件或已有对应的txt文件 - {FILE_PATH}")
@@ -65,6 +68,29 @@ def is_audio(FILE_PATH):
     """
     suffix = Path(FILE_PATH).suffix
     return suffix in (".mp3", ".wav", ".aac", ".flac", ".m4a", ".ogg", ".opus")
+
+
+def is_using_by_others(FILE_PATH):
+    """
+    判断文件是否被其他程序占用
+    """
+    try:
+        process = subprocess.Popen(
+            f"tasklist /fi 'filename eq {FILE_PATH}'",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            shell=True,
+        )
+        stdout, stderr = process.communicate()
+        stdout = stdout.decode("utf-8")
+        if FILE_PATH.name in stdout:
+            return True
+        else:
+            return False
+
+    except Exception as e:
+        logger.error(f"is_using_by_others 执行过程中出现错误: {e}")
+        return True
 
 
 def check_audio_integrity(FILE_PATH):
@@ -97,24 +123,25 @@ def gen_txt(FILE_PATH):
     """
     连接CapsWriter-Offline，识别音频并生成txt文件
     """
-    START_CLIENT_GUI_EXE_PATH: Path = Paths.start_client_gui_path
     try:
         logger.info(f"正在生成txt文件 - {FILE_PATH}")
-        result = subprocess.Popen(
-            f'"{START_CLIENT_GUI_EXE_PATH}" "{FILE_PATH}"',
+        process = subprocess.Popen(
+            f'"{Paths.start_client_gui_path}" "{FILE_PATH}"',
             creationflags=subprocess.CREATE_NO_WINDOW,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             shell=True,
             text=True,
         )
-        stdout, stderr = result.communicate()
-        if result.returncode != 0:
+        stdout, stderr = process.communicate()
+        if stderr:
             logger.error(f"生成txt文件失败 - {FILE_PATH}\n错误信息 - {stderr}")
         else:
             logger.info(f"已生成txt文件 - {FILE_PATH}")
     except Exception as e:
         logger.critical(f"gen_txt 执行过程中出现错误: {e}")
+    finally:
+        process.kill()
 
 
 def paths_check():
@@ -145,7 +172,11 @@ def gen_txt_for_files_which_already_in_dir():
     检查录音文件夹内现有录音文件是否有未生成txt文件的情况并生成txt文件
     """
     for file in Paths.call_recording_dir.iterdir():
-        if is_audio(file) and not file.with_suffix(".txt").exists():
+        if (
+            is_audio(file)
+            and not is_using_by_others(file)
+            and not file.with_suffix(".txt").exists()
+        ):
             logger.info(f"发现现有录音文件未生成txt，正在生成 - {file}")
             gen_txt(file)
             logger.info(f"已生成txt文件 - {file}")

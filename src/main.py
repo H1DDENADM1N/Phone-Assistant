@@ -8,6 +8,7 @@ from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
 from .config import Paths, logger_level
+from .write_md import write_md
 
 
 class Watcher:
@@ -137,7 +138,19 @@ def gen_txt(FILE_PATH):
         if stderr:
             logger.error(f"生成txt文件失败 - {FILE_PATH}\n错误信息 - {stderr}")
         else:
+            start_time = time.perf_counter()
+            durination = 0
+            while not FILE_PATH.with_suffix(".txt").exists():
+                if durination > 5:
+                    logger.error(f"生成txt文件超时 - {FILE_PATH}")
+                    break
+                time.sleep(1)  # wait for subprocess to generate txt file
+                durination = time.perf_counter() - start_time
             logger.info(f"已生成txt文件 - {FILE_PATH}")
+
+            logger.info(f"正在写入markdown文件 - {FILE_PATH}")
+            file_md = write_md(FILE_PATH)
+            logger.info(f"已写入markdown文件 - {file_md}")
     except Exception as e:
         logger.critical(f"gen_txt 执行过程中出现错误: {e}")
     finally:

@@ -1,13 +1,15 @@
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+import psutil
 from loguru import logger
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
-from .config import Paths, logger_level
+from .config import Paths, logger_level, process_name
 from .write_md import write_md
 
 
@@ -53,7 +55,7 @@ class Handler(FileSystemEventHandler):
             )
             is_valid, msg = check_audio_integrity(FILE_PATH)
         else:
-            logger.debug(f"非音频文件或已有对应的txt文件 - {FILE_PATH}")
+            logger.debug(f"非音频文件 或 文件被占用 或 已有对应的txt文件 - {FILE_PATH}")
             return None
 
         if is_valid:
@@ -73,25 +75,30 @@ def is_audio(FILE_PATH):
 
 def is_using_by_others(FILE_PATH):
     """
-    判断文件是否被其他程序占用
+    判断文件是否被特定程序占用
     """
-    try:
-        process = subprocess.Popen(
-            f"tasklist /fi 'filename eq {FILE_PATH}'",
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            shell=True,
-        )
-        stdout, stderr = process.communicate()
-        stdout = stdout.decode("utf-8")
-        if FILE_PATH.name in stdout:
-            return True
-        else:
-            return False
+    logger.debug(f"检查文件是否被其他程序占用 - {FILE_PATH}")
+    file_path_str = str(FILE_PATH)  # 转换为字符串形式的路径
 
-    except Exception as e:
-        logger.error(f"is_using_by_others 执行过程中出现错误: {e}")
-        return True
+    # 查找所有名为 process_name 的进程
+    for proc in psutil.process_iter(["pid", "name", "open_files"]):
+        if proc.info["name"] == process_name:
+            try:
+                # 获取进程打开的文件列表
+                open_files = proc.info["open_files"]
+                if open_files is not None:
+                    # 检查文件是否在进程打开的文件列表中
+                    for file in open_files:
+                        if file_path_str == file.path:
+                            logger.debug(
+                                f"文件被 {proc.info['pid']} 占用 - {FILE_PATH}"
+                            )
+                            return True  # 文件被占用
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                # 如果无法访问进程信息，则忽略
+                continue
+    logger.debug(f"文件未被其他程序占用 - {FILE_PATH}")
+    return False  # 文件未被占用
 
 
 def check_audio_integrity(FILE_PATH):

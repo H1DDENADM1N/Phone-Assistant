@@ -3,9 +3,12 @@
 
 [metadata]
 groups = ["default"]
-strategy = ["cross_platform", "inherit_metadata"]
-lock_version = "4.4.2"
+strategy = ["inherit_metadata"]
+lock_version = "4.5.0"
 content_hash = "sha256:3559802f715f2932481e05da24d07d994c86044b274146f0960952578bf43d31"
+
+[[metadata.targets]]
+requires_python = "==3.12.*"
 
 [[package]]
 name = "colorama"
@@ -26,6 +29,7 @@ requires_python = ">=3.5"
 summary = "Python logging made (stupidly) simple"
 groups = ["default"]
 dependencies = [
+    "aiocontextvars>=0.2.0; python_version < \"3.7\"",
     "colorama>=0.3.4; sys_platform == \"win32\"",
     "win32-setctime>=1.0.0; sys_platform == \"win32\"",
 ]

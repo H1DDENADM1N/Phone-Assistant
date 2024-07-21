@@ -45,15 +45,15 @@ class Handler(FileSystemEventHandler):
         if (
             event.event_type == "modified"
             and is_audio(FILE_PATH)
-            and not is_using_by_others(FILE_PATH)
             and not TXT_PATH.exists()
+            and not is_using_by_others(FILE_PATH)
         ):
             logger.info(
                 f"监测到音频文件修改，没有对应的txt文件，未被其他程序占用 - {FILE_PATH}"
             )
             is_valid, msg = check_audio_integrity(FILE_PATH)
         else:
-            logger.debug(f"非音频文件或已有对应的txt文件 - {FILE_PATH}")
+            # logger.debug(f"非音频文件 或 文件被占用 或 已有对应的txt文件 - {FILE_PATH}")
             return None
 
         if is_valid:
@@ -67,31 +67,38 @@ def is_audio(FILE_PATH):
     """
     判断文件是否为音频文件
     """
+    if "_temp" in FILE_PATH.stem:
+        return False  # 临时文件不处理
+
     suffix = Path(FILE_PATH).suffix
     return suffix in (".mp3", ".wav", ".aac", ".flac", ".m4a", ".ogg", ".opus")
 
 
 def is_using_by_others(FILE_PATH):
     """
-    判断文件是否被其他程序占用
+    尝试重命名文件来判断是否被占用。
     """
     try:
-        process = subprocess.Popen(
-            f"tasklist /fi 'filename eq {FILE_PATH}'",
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            shell=True,
-        )
-        stdout, stderr = process.communicate()
-        stdout = stdout.decode("utf-8")
-        if FILE_PATH.name in stdout:
-            return True
-        else:
-            return False
+        logger.debug(f"尝试重命名文件来判断是否被占用 - {FILE_PATH}")
+        # 创建一个临时文件名
+        temp_file_path = FILE_PATH.with_name(f"{FILE_PATH.stem}_temp{FILE_PATH.suffix}")
 
-    except Exception as e:
-        logger.error(f"is_using_by_others 执行过程中出现错误: {e}")
-        return True
+        # 尝试重命名文件
+        FILE_PATH.rename(temp_file_path)
+
+        # 重命名成功，文件未被占用，将文件名改回原样
+        temp_file_path.rename(FILE_PATH)
+        logger.debug(f"文件未被占用 - {FILE_PATH}")
+        return False  # 文件未被占用
+
+    except OSError as e:
+        # 如果重命名失败，则可能是因为文件被占用
+        if "WinError 32" in str(e):
+            logger.debug(f"文件被占用 - {FILE_PATH}")
+            return True  # 文件被占用
+        else:
+            logger.error(f"is_using_by_others 执行过程中出现错误: {e}")
+            return False  # 未知错误
 
 
 def check_audio_integrity(FILE_PATH):

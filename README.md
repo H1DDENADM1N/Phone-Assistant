@@ -18,7 +18,7 @@ Inspired by [请求监听转录功能 #31](https://github.com/H1DDENADM1N/CapsWr
 
 1. `pip install -r requirements.txt`
 
-2. 修改 `src/config.py` 文件，设置 `call_recording_dir` 和 `caps_writer_offline_dir` 。
+2. 修改 `src/config.py` 文件，设置 `call_recording_dir` 为你的通话录音文件夹路径 和 `caps_writer_offline_dir` 为 CapsWriter-Offline 程序目录 。
 
 3. 修改 CapsWriter-Offline `core_client.py` `main_file()` 函数，注释掉 `# input("\n按回车退出\n")`，否则subprocess无法退出，会在后台一直运行着多个`cmd.exe`和`python.exe`。
 
